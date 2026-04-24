@@ -1,3 +1,5 @@
+<img src="https://raw.githubusercontent.com/c6zks4gssn-droid/bonanza-labs-website/main/public/bonanza-labs-logo-256.png" alt="Bonanza Labs" width="128" />
+
 # 🔨 Bonanza App Forge
 
 **Visual idea → working app in minutes.**

@@ -263,6 +263,9 @@ def template(template_name: str, name: str | None, output: str, build: bool, dep
     ))
 
     code = get_template(template_name)
+    # get_template returns a dict with 'code' key or a string
+    if isinstance(code, dict):
+        code = code.get('code', '')
     project_dir = create_project(name, code, output)
     console.print(f"[green]✅ Project created: {project_dir}[/green]")
 
