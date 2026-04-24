@@ -244,7 +244,7 @@ def iterate(feedback: str, project: str, coder: str):
 
 
 @main.command()
-@click.argument("template_name", type=click.Choice(["faceless", "saas-dashboard", "portfolio"]))
+@click.argument("template_name", type=click.Choice(["gpt-image-studio", "tiktok-slideshow", "faceless", "saas-dashboard", "portfolio"]))
 @click.option("--name", "-n", help="Project name (default: template name)")
 @click.option("--output", "-o", default="./forge-output", help="Output directory")
 @click.option("--build/--no-build", default=True, help="Build after creating")
