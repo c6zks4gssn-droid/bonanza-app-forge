@@ -25,3 +25,6 @@ bonanza-forge = "bonanza_app_forge.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/bonanza_app_forge"]
+
+[project.urls]
+Logo = "https://bonanza-labs.tiiny.site/bonanza-labs-logo-256.png"
