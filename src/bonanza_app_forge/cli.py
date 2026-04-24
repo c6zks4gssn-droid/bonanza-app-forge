@@ -187,5 +187,107 @@ def config(local: bool):
             console.print("  export ANTHROPIC_API_KEY=sk-...")
 
 
+@main.command()
+@click.argument("feedback")
+@click.option("--project", "-p", required=True, help="Path to existing project")
+@click.option("--coder", type=click.Choice(["claude", "openai", "ollama"]), default="ollama", help="AI provider")
+def iterate(feedback: str, project: str, coder: str):
+    """Iterate on an existing project with feedback."""
+    console.print(Panel(
+        f"[bold]🔄 Iterating[/bold]\n\n"
+        f"Project: {project}\n"
+        f"Feedback: {feedback}\n"
+        f"Coder: {coder}",
+        border_style="yellow",
+    ))
+
+    page_path = Path(project) / "src" / "app" / "page.tsx"
+    if not page_path.exists():
+        console.print(f"[red]❌ No page.tsx found at {page_path}[/red]")
+        sys.exit(1)
+
+    current_code = page_path.read_text()
+
+    with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console) as progress:
+        task = progress.add_task("💻 Applying feedback...", total=None)
+        try:
+            from .codegen import generate_code_ollama, generate_code_claude, generate_code_openai
+
+            prompt = f"Here is the current page.tsx code:\n\n```tsx\n{current_code}\n```\n\nApply this change: {feedback}\n\nReturn the COMPLETE updated page.tsx file."
+
+            if coder == "ollama":
+                import requests
+                host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+                model = os.environ.get("OLLAMA_MODEL", "gemma3:12b")
+                resp = requests.post(f"{host}/api/generate", json={
+                    "model": model,
+                    "prompt": f"You are an expert React/Next.js developer. {prompt}",
+                    "stream": False,
+                    "options": {"num_predict": 8192},
+                }, timeout=300)
+                resp.raise_for_status()
+                new_code = resp.json()["response"]
+            elif coder == "claude":
+                new_code = generate_code_claude(None, prompt)
+            else:
+                new_code = generate_code_openai(None, prompt)
+
+            from .codegen import extract_code
+            clean_code = extract_code(new_code)
+            page_path.write_text(clean_code)
+            progress.update(task, completed=True)
+            console.print(f"[green]✅ Updated: {page_path}[/green]")
+        except Exception as e:
+            progress.update(task, completed=True)
+            console.print(f"[red]❌ Iteration failed: {e}[/red]")
+            sys.exit(1)
+
+
+@main.command()
+@click.argument("template_name", type=click.Choice(["faceless", "saas-dashboard", "portfolio"]))
+@click.option("--name", "-n", help="Project name (default: template name)")
+@click.option("--output", "-o", default="./forge-output", help="Output directory")
+@click.option("--build/--no-build", default=True, help="Build after creating")
+@click.option("--deploy", type=click.Choice(["tiiny", "none"]), default="none", help="Deploy target")
+def template(template_name: str, name: str | None, output: str, build: bool, deploy: str):
+    """Create an app from a pre-built template."""
+    from .templates import get_template, TEMPLATES
+    from .builder import create_project, build_project, deploy_tiiny
+
+    tpl = TEMPLATES[template_name]
+    name = name or template_name
+
+    console.print(Panel(
+        f"[bold]📋 Template: {tpl['name']}[/bold]\n\n{tpl['description']}",
+        border_style="cyan",
+    ))
+
+    code = get_template(template_name)
+    project_dir = create_project(name, code, output)
+    console.print(f"[green]✅ Project created: {project_dir}[/green]")
+
+    if build:
+        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console) as progress:
+            task = progress.add_task("🏗️ Building...", total=None)
+            success = build_project(project_dir)
+            progress.update(task, completed=True)
+            if success:
+                console.print(f"[green]✅ Build complete[/green]")
+            else:
+                console.print("[yellow]⚠️ Build failed — build manually[/yellow]")
+
+    if deploy == "tiiny":
+        tiiny_key = os.environ.get("TIINY_API_KEY")
+        domain = f"{name}.tiiny.site"
+        if tiiny_key:
+            success = deploy_tiiny(project_dir, domain, tiiny_key)
+            if success:
+                console.print(Panel(f"[bold green]🚀 Deployed![/bold green]\n\nURL: https://{domain}", border_style="green"))
+            else:
+                console.print("[red]❌ Deploy failed[/red]")
+        else:
+            console.print("[yellow]⚠️ TIINY_API_KEY not set[/yellow]")
+
+
 if __name__ == "__main__":
     main()
